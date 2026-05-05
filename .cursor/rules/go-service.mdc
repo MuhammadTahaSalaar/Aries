@@ -1,0 +1,32 @@
+---
+description: Go service conventions (Orchestration, API Gateway, Connectors)
+globs: apps/go_service/**/*.go
+alwaysApply: false
+---
+
+# Go Service Conventions
+
+Full specs: `apps/go_service/.ai/REQUIREMENTS.md`, `apps/go_service/.ai/TASKS.md`
+
+## Stack
+Go 1.25+, Fiber/Gin, gRPC, pgx/v5, kafka-go, go-redis/v9, go-elasticsearch/v8, zap, Prometheus
+
+## Package Layout
+- `cmd/` — Entry points (gateway, engine, worker). Thin main functions.
+- `internal/` — Private packages. All business logic lives here. Never import internal from outside.
+- `pkg/` — Exportable shared utilities only.
+- `api/proto/` — Protobuf definitions.
+
+## Patterns
+
+- **Error handling:** Always wrap errors with context: `fmt.Errorf("selecting playbook: %w", err)`. Never silently swallow errors.
+- **Interfaces:** Define at the consumer, not the provider. `IntegrationConnector` interface in `internal/connector/`.
+- **Concurrency:** Use context.Context for cancellation/timeout. Always pass ctx as first param.
+- **Logging:** Use `zap.Logger`. Structured fields: `zap.String("tenant_id", tid)`. No `fmt.Println`.
+- **Config:** Environment variables only (12-factor). Validate on startup, fail fast.
+- **DB queries:** Always include `WHERE tenant_id = $1` even with RLS (defense in depth).
+- **Idempotency:** All connector actions must be idempotent. Use Redis idempotency keys.
+- **Testing:** Table-driven tests. Use `testify/assert`. Mock interfaces, not implementations.
+
+## Kafka Consumer Groups
+`alert-ingestion`, `orchestration-engine`, `approval-monitor`

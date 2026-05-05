@@ -1,0 +1,29 @@
+---
+description: Docker and infrastructure conventions
+globs: "{docker-compose*.yml,**/Dockerfile,**/*.Dockerfile}"
+alwaysApply: false
+---
+
+# Docker & Infrastructure Conventions
+
+## Docker Compose Services (target state)
+- `postgres` — PostgreSQL 16 with RLS init scripts
+- `kafka` — KRaft mode (no ZooKeeper), with kafka-ui on :8090
+- `elasticsearch` — Single-node ES 8 for dev
+- `redis` — Redis 7
+- `neo4j` — Neo4j 5
+- `minio` — S3-compatible object storage
+- `dashboard` — Next.js app (port 3000)
+- `go_service` — Go service (port 8080)
+- `fastapi_service` — FastAPI service (port 8000)
+
+## Dockerfile Best Practices
+- Multi-stage builds (build stage + minimal runtime)
+- Non-root user in runtime stage
+- HEALTHCHECK instruction in every Dockerfile
+- Pin base image versions (e.g., `node:24-alpine`, `golang:1.25-alpine`, `python:3.11-slim`)
+- Copy dependency files first, install deps, then copy source (layer caching)
+
+## Environment Variables
+- All config via env vars (12-factor). Never hardcode secrets.
+- Use `.env.example` (committed) as template. `.env` is gitignored.

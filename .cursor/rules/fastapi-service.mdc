@@ -1,0 +1,34 @@
+---
+description: FastAPI service conventions (ML Triage, NLP, Training, Analytics)
+globs: apps/fastapi_service/**/*.py
+alwaysApply: false
+---
+
+# FastAPI Service Conventions
+
+Full specs: `apps/fastapi_service/.ai/REQUIREMENTS.md`, `apps/fastapi_service/.ai/TASKS.md`
+
+## Stack
+Python 3.11+, FastAPI, asyncpg, aiokafka, PyTorch, ONNX Runtime, HuggingFace, spaCy, MLflow
+
+## Module Layout
+- `src/triage/` — ML Triage Engine (scoring, enrichment, feature engineering)
+- `src/nlp/` — NLP Service (NER, summarization, IOC extraction)
+- `src/training/` — Model lifecycle (training, drift detection, feedback)
+- `src/analytics/` — KPI calculations (MTTD, MTTR, FP rate)
+- `src/shared/` — Shared clients (DB, Kafka, Redis, ES) and base schemas
+
+## Patterns
+
+- **Async everywhere:** Use `async def` for all handlers. Use `asyncpg`, `aiokafka`, `httpx.AsyncClient`.
+- **Pydantic models:** All request/response bodies are Pydantic v2 models. Validate inputs strictly.
+- **Dependency injection:** Use FastAPI `Depends()` for DB pool, Redis, Kafka producer.
+- **Config:** `pydantic-settings` BaseSettings from environment variables.
+- **Error handling:** Raise `HTTPException` with specific status codes. Custom exception handlers for domain errors.
+- **ML inference:** ONNX Runtime for production (fast). PyTorch only for training. Always have a heuristic fallback.
+- **Tenant isolation:** Every query includes `tenant_id`. Extracted from JWT in request.
+- **Testing:** `pytest` + `pytest-asyncio`. Use `httpx.AsyncClient` with `TestClient`. Mock external services.
+- **Linting:** `ruff` for linting and formatting. `mypy` for type checking.
+
+## Kafka Consumer Groups
+`ml-triage-engine`, `nlp-ioc-extractor`, `ml-feedback-collector`

@@ -1,0 +1,111 @@
+# running the containers
+
+docker compose up -d --build # first time
+
+docker compose up -d
+
+# stopping the containers
+
+docker compose down
+
+docker compose down -v # nuke option
+
+
+# connecting with Hydra
+
+ssh -i ~/.ssh/id_rsa_vsc vsc11249@login.hpc.vub.be
+
+
+# reactivating environment later
+
+# 1. Load the drivers and Mamba
+module purge
+module load CUDA/12.1.1  # Matches the PyTorch version we installed
+module load Mamba
+
+# 2. Universal Activation
+MAMBA_ROOT=$(dirname $(dirname $(which mamba)))
+source "${MAMBA_ROOT}/etc/profile.d/conda.sh"
+source "${MAMBA_ROOT}/etc/profile.d/mamba.sh"
+
+
+# 3. Activate using the full path to your environment
+mamba activate "${VSC_DATA}/Aries/envs/aries"
+
+
+# 3.5. Verify GPU is visible to PyTorch
+python -c "import torch; print(f'GPU Found: {torch.cuda.is_available()}')"
+
+# 4. Set project-specific environment variables
+export PROJECT_DIR="${VSC_DATA_VO_USER}/Aries_SOAR"
+export MLFLOW_TRACKING_URI="file://${PROJECT_DIR}/mlruns"
+
+cd ${PROJECT_DIR}
+
+# request for interactive session
+
+srun --partition=ampere_gpu --gpus-per-node=2 --ntasks-per-node=1 --mem=128G --cpus-per-task=16 --time=04:00:00 --pty bash
+
+
+# commands for viewing jobs on hydra
+
+1. Monitoring Your Specific Job
+
+Use these to see exactly what is happening with your request:
+
+    squeue -j <job_id> --start: Shows the estimated start time (as seen in your snippet).
+
+    scontrol show job <job_id>: Provides a deep dive into the job, including the full command run, memory requested, and detailed reasons for any delays.
+
+    sprio -j <job_id>: Shows your priority score components (Age, Fairshare, JobSize).
+
+2. Monitoring the Queue and Others
+
+To see where you stand relative to the rest of the cluster:
+
+    squeue -u $USER: The standard check for your own running and pending jobs.
+
+    mysqueue: A VSC-specific shortcut that often provides a cleaner, summarized view of your jobs.
+
+    squeue -p pascal_gpu: Shows everyone waiting or running in the pascal_gpu partition so you can see how many people are ahead of you.
+
+    squeue -t R: Shows only Running jobs across the whole cluster.
+
+    squeue -t PD: Shows only Pending jobs across the whole cluster.
+
+3. Cluster and Resource Info
+
+Use these to find "empty" spots or check node health:
+
+    sinfo: Displays a general overview of all partitions and their states (idle, mix, alloc, down).
+
+    sinfo -p pascal_gpu -N: Shows the status of every individual node in the Pascal GPU partition.
+
+    pestat -u $USER: A very helpful utility to see the CPU and memory usage of your running jobs in real-time.
+
+    sacctmgr show user $USER: Shows your account associations and limits.
+
+4. Historical Data
+
+If a job finishes and you want to know how it performed:
+
+    sacct -j <job_id>: Shows the final state (Completed, Failed, OutOfMemory) and the elapsed time.
+
+    sacct -j <job_id> --format=JobID,JobName,MaxRSS,Elapsed: Specifically checks the maximum memory (MaxRSS) used, which is vital for debugging "Out of Memory" crashes.
+
+5. Management Commands
+
+    scancel <job_id>: Kills the job immediately.
+
+    scontrol hold <job_id>: Pauses your job in the queue without deleting it.
+
+    scontrol release <job_id>: Resumes a held job.
+
+
+# code syncing
+
+rsync -avP --exclude '.venv' --exclude '__pycache__' ~/data/FYP/Aries/ hydra:/data/brussel/112/vsc11249/Aries_SOAR/
+
+# Removing outputs
+
+rm -f *.out *.err

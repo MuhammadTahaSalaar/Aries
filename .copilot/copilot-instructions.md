@@ -1,0 +1,1 @@
+"Always follow the architecture defined in .aiglobal/specs/DESIGN.md and the implementation rules in .cursor/rules/aries-global.mdc. For backend tasks, strictly adhere to .cursor/rules/fastapi-service.mdc to ensure coherence with the orchestrator engine."

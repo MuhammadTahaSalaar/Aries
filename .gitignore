@@ -1,0 +1,134 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ARIES SOAR — .gitignore
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── Python ───────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+*.manifest
+*.spec
+
+# ── Virtual environments ──────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Model weights — ALL binary model files (too large for GitHub) ─────────
+# PyTorch / HuggingFace weights
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# ONNX models
+*.onnx
+
+# GGUF quantized models
+*.gguf
+
+# XGBoost / sklearn pickles
+*.pkl
+*.joblib
+
+# XGBoost native format
+xgboost_*.json
+
+# Numpy arrays
+*.npz
+*.npy
+
+# ── Model directories ─────────────────────────────────────────────────────
+models/ner/
+models/triage/
+models/summarizer/
+models/onnx/
+models/optimized/
+models/slm_merged/
+# Keep models/slm_lora/ tracked (only 16 MB adapter configs + small weights)
+# but exclude the actual adapter weights binary
+models/slm_lora/**/*.safetensors
+
+# ── Training checkpoints ──────────────────────────────────────────────────
+checkpoints/
+
+# ── Processed data & datasets ─────────────────────────────────────────────
+# HuggingFace Arrow cache files
+*.arrow
+data/processed/
+
+# All raw datasets — ignore entirely (too large / not our code)
+datasets/
+
+# ── MLflow experiment tracking ────────────────────────────────────────────
+mlruns/
+mlflow.db
+
+# ── Docker volumes (bind-mount data, never code) ──────────────────────────
+MLOps/minio/
+MLOps/mlflow/
+MLOps/postgres/
+/data/docker-volumes/
+
+# ── Wazuh (submodule/vendor folder — not our code, very large) ────────────
+wazuh-docker/
+wazuh-integration/.gitkeep
+
+# ── Secrets & credentials — NEVER commit these ───────────────────────────
+.env
+.env.*
+!.env.example
+backblaze.txt
+*.key
+*.pem
+*.p12
+*.pfx
+secrets/
+*secret*
+*credential*
+*password*
+
+# ── Logs ─────────────────────────────────────────────────────────────────
+*.log
+*.err
+*.out
+logs/
+successful_outputs/
+
+# ── OS / editor ───────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# ── pytest / coverage ─────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── llama.cpp — entire vendor directory (3rd-party, ~100 MB source tree) ────
+llama.cpp/

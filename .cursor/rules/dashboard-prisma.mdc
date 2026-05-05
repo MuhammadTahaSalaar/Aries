@@ -1,0 +1,27 @@
+---
+description: Prisma schema conventions for ARIES domain models
+globs: apps/dashboard/prisma/**
+alwaysApply: false
+---
+
+# Prisma Schema Conventions
+
+The dashboard owns the Prisma schema — the single source of truth for the PostgreSQL database.
+
+## Rules
+
+- Every domain table MUST have a `tenantId` field (FK to Tenant) for multi-tenant isolation
+- Use `@@map("snake_case")` for table names, camelCase for Prisma model fields
+- All IDs are `String @id @default(cuid())` (CUID for distributed safety)
+- Timestamps: `createdAt DateTime @default(now())`, `updatedAt DateTime @updatedAt`
+- Enums for status fields: define as Prisma `enum` (e.g., `AlertStatus`, `CaseStatus`, `Severity`)
+- AuditLog is append-only: no `updatedAt`, no update/delete operations in code
+- Indexes: always index `tenantId` + frequently filtered fields (status, createdAt)
+- After schema changes: `npx prisma migrate dev --name descriptive_name`
+
+## Case Status Enum (state machine)
+Detected → Open → Investigating → Awaiting_Approval → Contained → Closed
+(Awaiting_Approval → Investigating is valid for approval grants)
+
+## Alert Status Enum
+New → Triaged → Closed_FP → Escalated

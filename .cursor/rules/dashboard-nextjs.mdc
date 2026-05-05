@@ -1,0 +1,33 @@
+---
+description: Dashboard (Next.js) conventions and patterns
+globs: apps/dashboard/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Dashboard Conventions
+
+Full specs: `apps/dashboard/.ai/REQUIREMENTS.md`, `apps/dashboard/.ai/TASKS.md`
+
+## Stack
+Next.js 15 (App Router), React 19, TypeScript, TailwindCSS, shadcn/ui, tRPC, Prisma, Better Auth
+
+## Patterns
+
+- **Components:** Use shadcn/ui from `@/components/ui/`. Don't create custom components for things shadcn already provides.
+- **Styling:** TailwindCSS only. No CSS modules. No styled-components.
+- **Forms:** react-hook-form + zod validation. Always validate on both client and server.
+- **Data Fetching:** tRPC hooks (`trpc.X.useQuery`, `trpc.X.useMutation`). No raw `fetch`.
+- **State:** React Query (via tRPC) for server state. React context only for UI state (theme, sidebar).
+- **Icons:** Lucide React (`lucide-react`).
+
+## Route Structure (App Router)
+- `/(auth)/*` — Public auth pages (login, register). Minimal layout.
+- `/(app)/*` — Protected pages with AppShell (sidebar + header). Requires auth.
+
+## tRPC Routers
+All routers in `trpc/routers/`. Register in `trpc/routers/_app.ts`.
+Use `protectedProcedure` for auth-required routes, `managerProcedure` for SOC_Manager+.
+Always filter by `tenant_id` from context.
+
+## Severity Colors
+Critical=red-500, High=orange-500, Medium=yellow-500, Low=blue-500

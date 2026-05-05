@@ -1,0 +1,90 @@
+{
+    "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
+    "general": {
+        "defaultApprovalMode": "default",
+        "checkpointing": {
+            "enabled": true
+        },
+        "sessionRetention": {
+            "enabled": true,
+            "maxAge": "30d",
+            "maxCount": 50
+        },
+        "topicUpdateNarration": true
+    },
+    "model": {
+        "name": "gemini-3.1-pro-preview",
+        "maxSessionTurns": -1,
+        "compressionThreshold": 0.7
+    },
+    "context": {
+        "fileName": [
+            "GEMINI.md",
+            "AGENTS.md"
+        ],
+        "includeDirectoryTree": true,
+        "discoveryMaxDirs": 200,
+        "memoryBoundaryMarkers": [
+            ".git"
+        ],
+        "fileFiltering": {
+            "respectGitIgnore": true,
+            "respectGeminiIgnore": true
+        }
+    },
+    "tools": {
+        "useRipgrep": true,
+        "truncateToolOutputThreshold": 40000,
+        "shell": {
+            "enableInteractiveShell": true,
+            "pager": "cat",
+            "showColor": true,
+            "inactivityTimeout": 300,
+            "backgroundCompletionBehavior": "notify"
+        }
+    },
+    "ui": {
+        "hideBanner": false,
+        "hideTips": false,
+        "compactToolOutput": true,
+        "hideContextSummary": false,
+        "showLineNumbers": true,
+        "dynamicWindowTitle": true,
+        "errorVerbosity": "full"
+    },
+    "security": {
+        "disableYoloMode": false,
+        "environmentVariableRedaction": {
+            "enabled": true,
+            "allowed": [
+                "GEMINI_API_KEY",
+                "GOOGLE_API_KEY",
+                "GOOGLE_CLOUD_PROJECT"
+            ],
+            "blocked": [
+                "POSTGRES_PASSWORD",
+                "MINIO_SECRET_KEY",
+                "WAZUH_API_PASSWORD",
+                "REDIS_PASSWORD"
+            ]
+        }
+    },
+    "privacy": {
+        "usageStatisticsEnabled": true
+    },
+    "experimental": {
+        "jitContext": true,
+        "memoryV2": true,
+        "enableAgents": true,
+        "taskTracker": true,
+        "gemma": true
+    },
+    "useWriteTodos": true,
+    "advanced": {
+        "excludedEnvVars": [
+            "DEBUG",
+            "DEBUG_MODE",
+            "NODE_ENV"
+        ]
+    }
+}

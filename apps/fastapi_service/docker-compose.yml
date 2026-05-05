@@ -1,0 +1,187 @@
+# ═══════════════════════════════════════════════════════════════════════
+# ARIES Platform — Production Serving Stack
+# ═══════════════════════════════════════════════════════════════════════
+#
+# This compose file contains ONLY the services needed for production
+# serving: Kafka, Redis, and the FastAPI inference service.
+#
+# Infrastructure services (PostgreSQL, MinIO, MLflow) are provided by
+# the MLOps stack in MLOps/docker-compose.yml. Both stacks communicate
+# over the shared "aries_network" Docker network.
+#
+# Usage:
+#   1. Start the MLOps stack first:
+#        cd MLOps && docker compose up -d
+#   2. Then start this stack:
+#        cd apps/fastapi_service && docker compose up -d
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+
+  # ── Apache Kafka (KRaft mode — no ZooKeeper) ───────────────────────
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: aries_kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      # KRaft mode
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Topics
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - /data/docker-volumes/aries/kafka:/var/lib/kafka/data
+    healthcheck:
+      test: [ "CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - aries
+
+  # ── Kafka UI (dev visibility) ───────────────────────────────────────
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: aries_kafka_ui
+    restart: unless-stopped
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: aries-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - aries
+
+  # ── Kafka Topic Initialisation ──────────────────────────────────────
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: aries_kafka_init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [ "/bin/bash", "-c" ]
+    command:
+      - |
+        echo "Creating Kafka topics..."
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts.raw --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts.enriched --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic cases.updated --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic playbooks.events --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic ml.feedback --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts.raw.dlq --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts.enriched.dlq --partitions 1 --replication-factor 1
+        echo "Topics created:"
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+    networks:
+      - aries
+
+  # ── Redis ───────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aries_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - /data/docker-volumes/aries/redis:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aries
+
+  # ── ARIES FastAPI Service (AI Brain) ────────────────────────────────
+  # Connects to postgres, minio, mlflow from the MLOps stack via aries_network.
+  fastapi_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aries_fastapi_service
+    container_name: aries_fastapi
+    restart: unless-stopped
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    ports:
+      - "8000:8000"
+    environment:
+      # Uses the MLOps postgres (admin/password123) with a separate 'aries' database
+      ARIES_DATABASE_URL: postgresql://admin:password123@postgres:5432/aries
+      ARIES_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      ARIES_REDIS_URL: redis://redis:6379/0
+      # Uses the MLOps MinIO (admin/password123)
+      ARIES_S3_ENDPOINT_URL: http://minio:9000
+      ARIES_S3_ACCESS_KEY: admin
+      ARIES_S3_SECRET_KEY: password123
+      ARIES_S3_BUCKET_MODELS: mlflow-bucket
+      # Uses the MLOps MLflow server
+      ARIES_MLFLOW_TRACKING_URI: http://mlflow:5000
+      ARIES_LOG_LEVEL: INFO
+      # SLM: use fine-tuned triage SLM (Phi-3-mini QLoRA, INT4-GGUF)
+      # "true"  → HTTP endpoints routed through the SLM (semantic reasoning, ~10-15s/call with 8 threads)
+      # "false" → HTTP endpoints use XGBoost+TargetEncoder (requires triage.onnx volume mount)
+      ARIES_USE_SLM: "true"
+      ARIES_SLM_MODEL_PATH: /tmp/aries_models/slm/triage_slm_q4.gguf
+      ARIES_SLM_NER_MODEL_PATH: /tmp/aries_models/slm/ner_slm_q4.gguf
+      # Summarizer GGUF not yet available — fall back to triage SLM (same Phi-3-mini base)
+      ARIES_SLM_SUMMARIZER_MODEL_PATH: /tmp/aries_models/slm/triage_slm_q4.gguf
+    volumes:
+      # Triage XGBoost ONNX model
+      - ../../models/onnx/triage.onnx:/tmp/aries_models/triage/triage.onnx:ro
+      # Bind-mount pre-fitted TargetEncoder so XGBoost fallback gets correct categorical encoding.
+      # The model_loader expects this path: settings.triage_encoder_local
+      - ../../models/onnx/triage_encoder.pkl:/tmp/aries_models/triage/triage_encoder.pkl:ro
+      # Bind-mount fine-tuned GGUFs for each task (Phi-3-mini QLoRA, INT4 quantized)
+      # Source: models/optimized/ — produced by Hydra SLURM export pipeline
+      - ../../models/optimized/triage/triage_slm_q4.gguf:/tmp/aries_models/slm/triage_slm_q4.gguf:ro
+      - ../../models/optimized/ner/ner_slm_q4.gguf:/tmp/aries_models/slm/ner_slm_q4.gguf:ro
+      # Summarizer GGUF: mount when available from models/optimized/summarizer/
+      # - ../../models/optimized/summarizer/summarizer_slm_q4.gguf:/tmp/aries_models/slm/summarizer_slm_q4.gguf:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - aries
+
+# Volumes use bind mounts on /data partition — see service definitions
+
+
+networks:
+  aries:
+    external: true
+    name: aries_network

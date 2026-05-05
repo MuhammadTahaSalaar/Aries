@@ -1,0 +1,20 @@
+python src/training/run_xgboost.py --lr 0.01 --depth 6 --rounds 500 --debug
+
+python src/training/run_bart.py --epochs 3 --debug
+
+accelerate launch \
+    --multi_gpu \
+    --num_processes 2 \
+    --mixed_precision fp16 \
+    src/training/run_bart.py --batch-size 8 --grad-accum 4
+
+cd $VSC_DATA_VO_USER/Aries_SOAR
+sbatch slurm/train_xgboost.sh           # 1 GPU, 4 hours
+sbatch slurm/train_bart.sh              # 2 GPUs, 12 hours
+# After both complete:
+sbatch slurm/export_onnx.sh   
+
+# From a machine that can reach both HPC and Docker host:
+rsync -avz vsc11249@login.hpc.vub.be:$VSC_DATA/Aries/models/ ./models/
+rsync -avz vsc11249@login.hpc.vub.be:$VSC_DATA/Aries/mlruns/ ./mlruns/
+# Then import into dockerized MLflow via API or mc cp to MinIOc cp to MinIO

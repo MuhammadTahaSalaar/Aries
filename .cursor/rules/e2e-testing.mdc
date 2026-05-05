@@ -1,0 +1,29 @@
+---
+description: E2E testing conventions with Playwright
+globs: apps/dashboard-e2e/**/*.{ts,spec.ts}
+alwaysApply: false
+---
+
+# E2E Testing Conventions
+
+Full specs: `apps/dashboard-e2e/.ai/REQUIREMENTS.md`, `apps/dashboard-e2e/.ai/TASKS.md`
+
+## Patterns
+
+- **Page Object Model:** All page interactions in `src/pages/*.page.ts`. Tests import page objects.
+- **Fixtures:** Auth fixtures for each role in `src/fixtures/auth.fixture.ts`. Reuse sessions.
+- **Test data:** Seed via API, clean up after. Use unique tenant per test suite for isolation.
+- **Assertions:** Use Playwright's built-in `expect()`. Avoid arbitrary `waitForTimeout`.
+- **Selectors:** Prefer `data-testid` attributes. Fallback: accessible roles/labels.
+
+## Test Users (from seed data)
+`analyst@test.aries.local` (Tier1), `manager@test.aries.local` (SOC_Manager), `admin@test.aries.local` (Admin)
+
+## Test Structure
+```
+src/tests/auth.spec.ts       — Login, register, logout, session
+src/tests/triage.spec.ts     — Alert queue, filtering, actions
+src/tests/cases.spec.ts      — Case lifecycle, timeline, IOCs
+src/tests/approvals.spec.ts  — Approve/reject workflow
+src/tests/rbac.spec.ts       — Role-based access enforcement
+```

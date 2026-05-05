@@ -1,0 +1,112 @@
+services:
+  # 1. The Database: Stores text data like "Accuracy: 95%"
+  postgres:
+    image: postgres:latest
+    container_name: mlflow_db
+    ports:
+      - "5432:5432"
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - mlflow_postgres_data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aries
+
+  # 2. Storage: Stores heavy files like model weights (.pkl or .pt files)
+  minio:
+    image: minio/minio
+    container_name: mlflow_minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+      - MINIO_STORAGE_USE_HTTPS=false
+    command: server /data --console-address ":9001"
+    volumes:
+      - /data/docker-volumes/aries/minio:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aries
+
+  minio-setup:
+    image: minio/mc
+    container_name: minio_setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./minio/create_bucket.sh:/create_bucket.sh
+    entrypoint: "/bin/sh"
+    command: -c "chmod +x /create_bucket.sh && /create_bucket.sh"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    networks:
+      - aries
+
+  # 3. MLflow: The Control Panel you will actually use
+  mlflow:
+    restart: always
+    build: ./mlflow
+    image: mlflow_server
+    container_name: mlflow_server
+    ports:
+      - "5000:5000"
+    environment:
+      - MLFLOW_S3_IGNORE_TLS=true
+      - MLFLOW_S3_ENDPOINT_URL=${MLFLOW_S3_ENDPOINT_URL}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: >
+      mlflow server  --backend-store-uri postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME} --serve-artifacts --artifacts-destination s3://mlflow-bucket --host 0.0.0.0
+    networks:
+      - aries
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: mlflow_pgadmin
+    restart: always
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PG_ADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PG_ADMIN_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "8088:80"
+    volumes:
+      - /data/docker-volumes/aries/pgadmin:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - aries
+
+# Volumes use bind mounts on /data partition — see service definitions
+# Exception: PostgreSQL needs a named volume (NTFS doesn't support Unix permissions)
+
+volumes:
+  mlflow_postgres_data:
+
+
+networks:
+  aries:
+    name: aries_network

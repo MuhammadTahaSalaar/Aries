@@ -1,0 +1,34 @@
+---
+description: ARIES platform global architecture and conventions. Always active.
+alwaysApply: true
+---
+
+# ARIES — AI-Enhanced SOAR Platform
+
+This is the ARIES monorepo (Nx). Refer to these docs for full specs:
+- `.aiglobal/specs/REQUIREMENTS.md` — All 28 functional requirements (REQ-01..28)
+- `.aiglobal/specs/DESIGN.md` — Architecture, domain model, data design
+- `.aiglobal/specs/TASKS.md` — Master task list (T-001..028)
+
+## Architecture (must follow)
+
+- **Microservices, event-driven** via Apache Kafka
+- **Polyglot persistence:** PostgreSQL (system of record), Elasticsearch (search/telemetry), Neo4j (graph), Redis (cache), S3 (objects)
+- **Multi-tenant:** Every table has `tenant_id`. RLS in PostgreSQL. Index-per-tenant in ES.
+- **Auth:** OAuth2/OIDC + RBAC. Roles: Tier1_Analyst, Tier2_Analyst, SOC_Manager, Security_Engineer, Admin
+
+## Services
+
+| App | Stack | Port | Owns |
+|---|---|---|---|
+| `apps/dashboard` | Next.js 15, React 19, tRPC, Prisma, shadcn/ui | 3000 | UI, auth, Prisma schema |
+| `apps/go_service` | Go, Fiber/Gin, gRPC, pgx | 8080/9090 | Orchestration, API Gateway, Connectors, Ingestion |
+| `apps/fastapi_service` | FastAPI, PyTorch, HuggingFace, ONNX | 8000 | ML Triage, NLP, Training, Analytics |
+
+## Kafka Topics
+
+`alerts.raw`, `alerts.enriched`, `cases.updated`, `playbooks.events`, `ml.feedback`
+
+## Domain Entities (consistent across all services)
+
+Alert, Case, Playbook, PlaybookRun, Action, IOC, ApprovalRequest, AuditLog, Tenant, User

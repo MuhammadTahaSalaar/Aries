@@ -1,0 +1,62 @@
+# ──────────────────────────────────────────────────────────────────────
+# ARIES — rsync exclude list for sync_to_hydra.sh
+# Excludes heavy model weights, datasets, environments, and editor files.
+# Heavy models are downloaded/generated on Hydra instead.
+# ──────────────────────────────────────────────────────────────────────
+
+# Data and Research datasets
+data/
+checkpoints/
+datasets/
+
+# Heavy model weights (not needed on Hydra — download from HuggingFace or regenerate)
+# LoRA adapters (models/slm_lora/) are kept — they are small (16 MB) and needed for merge step
+models/ner/model.safetensors
+models/ner/secureBERT_pretrained/
+models/summarizer/model.safetensors
+models/triage/triage_encoder.pkl
+models/triage/xgboost_triage.json
+models/triage/confusion_matrix.png
+models/slm_merged/
+models/onnx/triage_slm/
+models/onnx/triage.onnx
+models/onnx/ner.onnx
+models/onnx/ner.opt.onnx
+models/onnx/triage_encoder.pkl
+models/onnx/summarizer/
+models/optimized/triage/
+models/optimized/ner/
+models/optimized/summarizer/
+
+# MLflow run artifacts
+mlruns/
+
+# Environments and Cache
+.venv/
+envs/
+__pycache__/
+**/__pycache__/
+.conda/
+.pytest_cache/
+
+# llama.cpp build outputs (will be compiled on Hydra with GPU support)
+llama.cpp/build/
+
+# Docker data volumes (local only)
+MLOps/minio/
+MLOps/postgres/
+
+# Git and IDE configs
+.git/
+.gitignore
+.cursor/
+.copilot/
+.aiglobal/
+.gemini/
+GEMINI.md
+.vscode/
+.DS_Store
+
+# Wazuh (not needed on Hydra)
+wazuh-docker/
+wazuh-integration/
