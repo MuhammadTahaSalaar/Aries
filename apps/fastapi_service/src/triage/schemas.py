@@ -83,6 +83,10 @@ class CanonicalAlert(BaseModel):
         """
         if not isinstance(values, dict):
             return values
+        # Normalise severity to title-case so "high", "HIGH" etc. all work
+        if "severity" in values and isinstance(values["severity"], str):
+            values["severity"] = values["severity"].capitalize()
+
         known = {
             "alert_id", "tenant_id", "timestamp", "source",
             "normalized_title", "severity", "raw_data",

@@ -45,8 +45,20 @@ async def score_alert(
 
     features = extract_features(alert_dict, encoder=model_store.triage_encoder)
 
-    # Derive enrichment scores from the alert context
+    # Derive enrichment scores from the alert context.
+    # severity_explicit tracks whether the caller sent an actual severity value
+    # or whether it's still the schema default ("Medium"). When it's the default,
+    # we let the SLM infer severity from context and pass asset_criticality=None
+    # so run_triage_inference_slm can recompute it from the SLM's verdict.
     severity = alert.severity.value if alert.severity else "Medium"
+
+    # severity_was_defaulted: True when the caller did not send an explicit
+    # severity value. In that case we ask the SLM to infer it from context.
+    severity_was_defaulted = (
+        severity == "Medium"
+        and not alert.raw_data.get("severity")
+    )
+
     title_lower = (alert.normalized_title or "").lower()
 
     # Asset criticality from severity + entity context
@@ -67,7 +79,9 @@ async def score_alert(
             alert_dict=alert_dict,
             alert_id=alert.alert_id,
             tenant_id=tenant_id,
-            asset_criticality=asset_criticality,
+            # Pass None when severity was defaulted so SLM can infer it
+            asset_criticality=None if severity_was_defaulted else asset_criticality,
+            asset_criticality_fallback=asset_criticality,
             behavioral_score=behavioral_score,
             settings=settings,
             suspicion_level=alert.suspicion_level,

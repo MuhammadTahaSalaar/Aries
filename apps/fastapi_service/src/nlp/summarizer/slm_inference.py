@@ -65,10 +65,12 @@ def _clean_slm_summary(summary: str, source_text: str) -> str:
 
 try:
     from llama_cpp import Llama
-    from src.triage.slm_inference import get_slm
+    from src.triage.slm_inference import get_slm, _slm_lock
 except ImportError:
+    import threading
     Llama = None
     get_slm = lambda x: None
+    _slm_lock = threading.Lock()
 
 
 def _build_summary_prompt(text: str, mode: SummarizeMode) -> str:
@@ -99,12 +101,13 @@ def _run_slm_summary_sync(model_path: str, text: str, mode: SummarizeMode) -> st
         return f"Mock {mode.value} summary for local testing. The SLM is not installed."
 
     max_tokens = 96 if mode == SummarizeMode.EXECUTIVE else 220
-    response = llm(
-        prompt,
-        max_tokens=max_tokens,
-        stop=["<|end|>", "<|eot_id|>", "</s>", "<|user|>", "<|assistant|>"],
-        temperature=0.1
-    )
+    with _slm_lock:
+        response = llm(
+            prompt,
+            max_tokens=max_tokens,
+            stop=["<|end|>", "<|eot_id|>", "</s>", "<|user|>", "<|assistant|>"],
+            temperature=0.1
+        )
 
     raw = response["choices"][0]["text"].strip()
     return _clean_slm_summary(raw, text)

@@ -86,7 +86,7 @@ Takes a **CanonicalAlert** and returns an ML risk score. All fields except `aler
 | `category` | string | No | Alert category / Wazuh rule group |
 | `threat_family` | string | No | Malware family |
 
-> **Severity enum is title-case**. Sending `"high"` returns a 422 validation error. Use `"High"`.
+> **Severity is case-insensitive**: `"high"`, `"HIGH"`, and `"High"` all work.
 
 **Successful example — SSH brute-force**
 
@@ -329,8 +329,8 @@ This triggers ARIES for all alerts at Wazuh level 7 and above.
 
 | Mistake | Correct Usage |
 |---------|---------------|
-| `"severity": "high"` | `"severity": "High"` (title-case enum) |
-| `"severity": "CRITICAL"` | `"severity": "Critical"` |
+| `"severity": "high"` | Accepted — coerced to `"High"` automatically |
+| `"severity": "CRITICAL"` | Accepted — coerced to `"Critical"` automatically |
 | POST to `/triage/predict` | POST to `/triage/score` |
 | POST to `/ner/extract` | POST to `/nlp/ner` |
 | Missing `Content-Type` header | Always include `-H "Content-Type: application/json"` |

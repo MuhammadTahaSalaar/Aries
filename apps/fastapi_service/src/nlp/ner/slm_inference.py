@@ -21,10 +21,12 @@ log = get_logger("ner_slm_inference")
 
 try:
     from llama_cpp import Llama
-    from src.triage.slm_inference import get_slm
+    from src.triage.slm_inference import get_slm, _slm_lock
 except ImportError:
+    import threading
     Llama = None
     get_slm = lambda x: None
+    _slm_lock = threading.Lock()
 
 
 def _extract_first_json_object(raw_text: str) -> str | None:
@@ -176,12 +178,13 @@ def _run_slm_ner_sync(model_path: str, text: str) -> dict[str, Any]:
             "events": [{"type": "MockEvent", "keyword": "mock"}]
         }
 
-    response = llm(
-        prompt,
-        max_tokens=160,
-        stop=["<|end|>", "<|eot_id|>", "</s>", "<|assistant|>"],
-        temperature=0.1
-    )
+    with _slm_lock:
+        response = llm(
+            prompt,
+            max_tokens=160,
+            stop=["<|end|>", "<|eot_id|>", "</s>", "<|assistant|>"],
+            temperature=0.1
+        )
     
     try:
         text_output = response["choices"][0]["text"].strip()
