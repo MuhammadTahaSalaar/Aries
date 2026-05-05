@@ -11,6 +11,7 @@
 #   bash setup_runpod.sh
 ###############################################################################
 set -euo pipefail
+export PIP_DISABLE_PIP_VERSION_CHECK=1   # suppress pip upgrade notice
 
 echo "=============================================="
 echo "ARIES FastAPI — RunPod Direct Install"
@@ -18,28 +19,46 @@ echo "Date: $(date)"
 echo "CUDA devices: $(nvidia-smi -L 2>/dev/null || echo 'none visible')"
 echo "=============================================="
 
-# ── 1. llama-cpp-python with CUDA (must be BEFORE requirements.txt) ──
-# pip install from requirements.txt would install a CPU-only wheel if
-# llama-cpp-python appears there. We build from source with GGML_CUDA=ON
-# first so the CUDA build is already present and pip skips it later.
-echo "Building llama-cpp-python with CUDA support..."
-CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
+# ── 1. Ensure nvcc is on PATH so cmake can find the CUDA toolkit ──────
+# RunPod images have the CUDA toolkit at /usr/local/cuda but nvcc may not
+# be on PATH yet. Without nvcc, cmake silently falls back to a CPU build.
+export CUDA_HOME="${CUDA_HOME:-/usr/local/cuda}"
+export PATH="${CUDA_HOME}/bin:${PATH}"
+export LD_LIBRARY_PATH="${CUDA_HOME}/lib64:${LD_LIBRARY_PATH:-}"
 
-# ── 2. All other dependencies ─────────────────────────────────────────
+if ! command -v nvcc &>/dev/null; then
+    echo "WARNING: nvcc not found at ${CUDA_HOME}/bin — CUDA build may fall back to CPU"
+else
+    echo "nvcc found: $(nvcc --version | grep release)"
+fi
+
+# ── 2. llama-cpp-python with CUDA (must be BEFORE requirements.txt) ───
+# FORCE_CMAKE=1 forces source compilation (never uses a pre-built wheel).
+# Without it, pip may silently pick a CPU-only wheel from PyPI.
+echo "Building llama-cpp-python with CUDA support..."
+CMAKE_ARGS="-DGGML_CUDA=ON" FORCE_CMAKE=1 \
+    pip install llama-cpp-python --force-reinstall --no-cache-dir
+
+# ── 3. All other dependencies ─────────────────────────────────────────
 echo "Installing remaining dependencies..."
 pip install -r requirements.txt
 
-# ── 3. Verify llama-cpp-python kept its CUDA build ────────────────────
+# ── 4. Verify llama-cpp-python kept its CUDA build ────────────────────
 echo "Verifying llama-cpp-python CUDA build..."
 python -c "
-from llama_cpp import Llama
 import llama_cpp
 print(f'llama-cpp-python: {llama_cpp.__version__}')
-# Check if CUDA support compiled in
-supports_gpu = getattr(llama_cpp.llama_cpp, 'GGML_USE_CUDA', False) or \
-               getattr(llama_cpp.llama_cpp, 'GGML_USE_CUBLAS', False)
-print(f'CUDA backend compiled: {supports_gpu}')
-" 2>/dev/null || echo "WARNING: could not verify CUDA flag (non-fatal)"
+# llama_print_system_info() returns a byte string like '... CUDA = 1 ...'
+try:
+    info = llama_cpp.llama_cpp.llama_print_system_info().decode()
+    cuda_on = 'CUDA = 1' in info or 'CUBLAS = 1' in info
+    print(f'CUDA backend compiled: {cuda_on}')
+    if not cuda_on:
+        print('WARNING: CUDA = 0 in system info — running CPU-only')
+        print('  Check that nvcc was available during build (see above).')
+except Exception as e:
+    print(f'Could not read system info: {e}')
+"
 
 echo ""
 echo "=============================================="

@@ -22,6 +22,12 @@ if [ ! -x "${PYTHON_BIN}" ]; then
     exit 1
 fi
 
+# Prepend conda env nvidia libs so they shadow the older CUDA/12.1.1 module libs
+# (module load CUDA/12.1.1 puts an old libnvJitLink.so.12 first in LD_LIBRARY_PATH
+# which is missing the __nvJitLinkCreate_12_8 symbol required by nvjitlink 12.9).
+NVIDIA_LIBS="${ENV_PATH}/lib/python3.10/site-packages/nvidia"
+export LD_LIBRARY_PATH="${NVIDIA_LIBS}/nvjitlink/lib:${NVIDIA_LIBS}/cusparse/lib:${LD_LIBRARY_PATH:-}"
+
 # Redirect HuggingFace model cache to VSC_DATA (home quota is too small for Phi-3-mini ~3.8GB)
 export HF_HOME="${PROJECT_DIR}/hf_cache"
 mkdir -p "${HF_HOME}"
