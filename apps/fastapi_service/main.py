@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await db.connect()
         app.state.db = db
     except Exception:
-        log.exception("database_connection_failed")
+        log.warning("database_connection_failed")
         app.state.db = None
 
     # ── Redis ─────────────────────────────────────────────────────────
@@ -80,12 +80,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.redis = RedisClient(settings)  # Unconnected placeholder
 
     # ── S3 / MinIO — Download ONNX models (MLflow-resolved) ────────────
+    # Skip S3 entirely when SLM mode is active — ONNX models are not used.
     s3 = S3Client(settings)
-    try:
-        await download_models(s3, settings)
-        log.info("models_downloaded_from_s3")
-    except Exception:
-        log.warning("s3_model_download_failed_using_local_cache")
+    if not settings.use_slm:
+        try:
+            await download_models(s3, settings)
+            log.info("models_downloaded_from_s3")
+        except Exception:
+            log.warning("s3_model_download_failed_using_local_cache")
+    else:
+        log.info("s3_download_skipped", reason="use_slm=True, ONNX models not needed")
 
     # ── Load ONNX sessions ────────────────────────────────────────────
     model_store = load_model_store(settings)

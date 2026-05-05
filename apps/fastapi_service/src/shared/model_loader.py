@@ -324,6 +324,12 @@ def load_model_store(settings: ServiceSettings) -> ModelStore:
         elif not llama_available:
             log.warning("llama_cpp_not_installed_slm_disabled")
 
+    # When SLM is active and ready, ONNX models are not used for inference.
+    # Skip loading them to avoid noisy errors from missing/invalid ONNX files.
+    if store.slm_ready:
+        log.info("onnx_load_skipped", reason="slm_ready=True, all inference routed via GGUF")
+        return store
+
     # ── Triage ────────────────────────────────────────────────────────
     triage_path = settings.triage_model_local
     if triage_path.exists():

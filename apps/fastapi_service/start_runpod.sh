@@ -11,7 +11,7 @@ set -euo pipefail
 export ARIES_USE_SLM=true
 export ARIES_SLM_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf
 export ARIES_SLM_NER_MODEL_PATH=/runpod-volume/aries_models/ner_slm_q4.gguf
-export ARIES_SLM_SUMMARIZER_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf
+export ARIES_SLM_SUMMARIZER_MODEL_PATH=/runpod-volume/aries_models/summarizer_slm_q4.gguf
 
 # ── Disable infrastructure services not present on RunPod ─────────────
 # The service degrades gracefully when these are unreachable:
@@ -30,8 +30,9 @@ export ARIES_LOG_LEVEL=INFO
 cd /workspace/Aries/apps/fastapi_service
 
 echo "Starting ARIES FastAPI service on port 8000..."
-echo "SLM model : ${ARIES_SLM_MODEL_PATH}"
-echo "NER model : ${ARIES_SLM_NER_MODEL_PATH}"
+echo "SLM triage model    : ${ARIES_SLM_MODEL_PATH}"
+echo "SLM NER model       : ${ARIES_SLM_NER_MODEL_PATH}"
+echo "SLM summarizer model: ${ARIES_SLM_SUMMARIZER_MODEL_PATH}"
 echo ""
 
 # Use 1 worker on RunPod (GGUFs are not fork-safe with multiple workers)
