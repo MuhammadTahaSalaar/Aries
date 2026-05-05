@@ -146,52 +146,58 @@ ls /runpod-volume/aries_models/
 In RunPod → **My Pods** → **Edit Pod** → **Environment Variables**, add:
 
 ```
-ARIES_DATABASE_URL=postgresql://aries:aries@localhost:5432/aries
-ARIES_REDIS_URL=redis://localhost:6379/0
-ARIES_S3_ENDPOINT_URL=http://localhost:9000
 ARIES_USE_SLM=true
 ARIES_SLM_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf
 ARIES_SLM_NER_MODEL_PATH=/runpod-volume/aries_models/ner_slm_q4.gguf
-ARIES_SLM_SUMMARIZER_MODEL_PATH=
+ARIES_SLM_SUMMARIZER_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf
 ARIES_LOG_LEVEL=INFO
 ```
 
-> **Note**: For a standalone GPU inference deployment (no full MLOps stack), you
-> can disable the Kafka/Postgres/MinIO dependencies by not providing those URLs —
-> the service gracefully degrades and still serves HTTP inference endpoints.
+> **Note**: Kafka, Postgres, MinIO, and Redis are set to localhost in `start_runpod.sh`.
+> The service degrades gracefully when they're unreachable — all HTTP inference
+> endpoints (`/triage`, `/nlp/ner`, `/nlp/summarize`) still work fine.
 
-### Step 5 — Build and run the Docker image
+### Step 5 — Install dependencies and start the service
+
+> **Why not `docker build`?** RunPod pods *are* Docker containers. Nested Docker
+> (`docker build` inside a pod) is not available. We install directly into the pod's
+> Python environment instead.
 
 ```bash
-# On the RunPod instance
-git clone https://github.com/YOUR_USERNAME/Aries.git /workspace/Aries
+# Clone the repo
+git clone https://github.com/MuhammadTahaSalaar/Aries.git /workspace/Aries
 cd /workspace/Aries/apps/fastapi_service
 
-# Build with GPU support (llama-cpp-python compiled with GGML_CUDA=ON)
-docker build -t aries_fastapi_service .
+# Install llama-cpp-python with CUDA FIRST (must precede requirements.txt)
+CMAKE_ARGS="-DGGML_CUDA=on" pip install llama-cpp-python --force-reinstall --no-cache-dir
 
-# Run with GPU and model volume
-docker run -d \
-  --gpus all \
-  --name aries_fastapi \
-  -p 8000:8000 \
-  -v /runpod-volume/aries_models:/runpod-volume/aries_models:ro \
-  -e ARIES_USE_SLM=true \
-  -e ARIES_SLM_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf \
-  -e ARIES_SLM_NER_MODEL_PATH=/runpod-volume/aries_models/ner_slm_q4.gguf \
-  -e ARIES_SLM_SUMMARIZER_MODEL_PATH=/runpod-volume/aries_models/triage_slm_q4.gguf \
-  -e ARIES_LOG_LEVEL=INFO \
-  aries_fastapi_service
+# Install all other dependencies
+pip install -r requirements.txt
+
+# Start the service
+bash start_runpod.sh
+```
+
+Or use the all-in-one setup script:
+```bash
+cd /workspace/Aries/apps/fastapi_service
+bash setup_runpod.sh   # installs everything
+bash start_runpod.sh   # starts uvicorn
 ```
 
 ### Step 6 — Verify GPU is being used
 
 ```bash
-docker exec aries_fastapi python -c "import torch; print(torch.cuda.is_available())"
-# Should print: True
+# In a second RunPod terminal
+python -c "
+from llama_cpp import Llama
+llm = Llama('/runpod-volume/aries_models/triage_slm_q4.gguf', n_gpu_layers=-1, n_ctx=512)
+print('GPU offload active')
+"
 
-# Check llama.cpp GPU layers in logs
-docker logs aries_fastapi | grep -i "gpu\|offload\|n_gpu"
+# Watch GPU utilisation while making a test request
+nvidia-smi dmon -s u &
+curl -s http://localhost:8000/health
 ```
 
 ### Step 7 — Get your public URL

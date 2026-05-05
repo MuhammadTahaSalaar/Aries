@@ -42,5 +42,5 @@ joblib>=1.3.0
 category-encoders>=2.6.0
 
 # ── SLM inference (llama-cpp-python installed separately in Dockerfile) ──
-# llama-cpp-python is installed via Dockerfile with CMAKE_ARGS for CPU-only
-# build to avoid recompiling when requirements.txt changes. No entry here.
+# Built with CMAKE_ARGS="-DGGML_CUDA=ON" FORCE_CMAKE=1 for full GPU offload.
+# Not listed here to avoid pip overwriting the CUDA build. No entry here.
